@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<title>Movie List Manager</title>
+<style>
+body { font-family: Arial; max-width: 800px; margin: 0 auto; padding: 20px; background: #f4f4f4; }
+h1,h2 { text-align:center; }
+.section { background:white; padding:20px; margin-bottom:20px; border-radius:8px; }
+input { width:100%; padding:8px; margin-bottom:10px; border-radius:4px; border:1px solid #ccc; }
+button { padding:10px 15px; border:none; border-radius:4px; background:#007bff; color:white; cursor:pointer; }
+button:hover { background:#0056b3; }
+.hidden { display:none; }
+#movies-list li { background:#f9f9f9; padding:8px; margin-bottom:5px; border-radius:4px; list-style:none; }
+.error { color:red; text-align:center; }
+.success { color:green; text-align:center; }
+</style>
+</head>
+<body>
+
+<h1>Movie List Manager</h1>
+
+<div id="register-section" class="section">
+<h2>Register</h2>
+<input type="text" id="register-username" placeholder="Username">
+<input type="password" id="register-password" placeholder="Password">
+<button onclick="register()">Register</button>
+<p id="register-message" class="error"></p>
+</div>
+
+<div id="login-section" class="section">
+<h2>Login</h2>
+<input type="text" id="login-username" placeholder="Username">
+<input type="password" id="login-password" placeholder="Password">
+<button onclick="login()">Login</button>
+<p id="login-message" class="error"></p>
+</div>
+
+<div id="movies-section" class="section hidden">
+<h2>Welcome, <span id="username"></span>!</h2>
+<button onclick="logout()">Logout</button>
+<input type="text" id="movies-input" placeholder="Add movie e.g., Inception">
+<button onclick="addMovies()">Add Movie</button>
+<ul id="movies-list"></ul>
+<p id="movies-message" class="error"></p>
+</div>
+
+<script>
+let userId = null;
+let username = null;
+
+// 👇 Base URL will automatically match where you opened index.html
+// e.g. http://127.0.0.1:5000 OR http://<minikube-ip>:30080
+const API_BASE_URL = window.location.origin;
+
+async function register(){
+  const username = document.getElementById('register-username').value;
+  const password = document.getElementById('register-password').value;
+  const messageEl = document.getElementById('register-message');
+  messageEl.textContent='';
+
+  try{
+    const res = await fetch(`${API_BASE_URL}/api/register`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username,password})
+    });
+    const data = await res.json();
+    if(res.ok){
+      messageEl.className='success';
+      messageEl.textContent=`Registered! Please login.`;
+    } else {
+      messageEl.textContent=data.error || 'Registration failed';
+    }
+  } catch(e){
+    messageEl.textContent='Server connection error';
+  }
+}
+
+async function login(){
+  const usernameVal = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+  const messageEl = document.getElementById('login-message');
+  messageEl.textContent='';
+
+  try{
+    const res = await fetch(`${API_BASE_URL}/api/login`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username:usernameVal,password})
+    });
+    const data = await res.json();
+    if(res.ok){
+      userId = data.user_id;
+      username = data.username;
+      document.getElementById('username').textContent=username;
+      document.getElementById('register-section').classList.add('hidden');
+      document.getElementById('login-section').classList.add('hidden');
+      document.getElementById('movies-section').classList.remove('hidden');
+      fetchMovies();
+    } else {
+      messageEl.textContent=data.error || 'Login failed';
+    }
+  } catch(e){
+    messageEl.textContent='Server connection error';
+  }
+}
+
+async function addMovies(){
+  const movieInput=document.getElementById('movies-input').value;
+  const messageEl=document.getElementById('movies-message');
+  messageEl.textContent='';
+  if(!movieInput){
+    messageEl.textContent='Enter a movie';
+    return;
+  }
+
+  try{
+    const res = await fetch(`${API_BASE_URL}/api/add_movie`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_id:userId, movie:movieInput})
+    });
+    const data = await res.json();
+    if(res.ok){
+      messageEl.className='success';
+      messageEl.textContent=data.message;
+      document.getElementById('movies-input').value='';
+      fetchMovies();
+    } else {
+      messageEl.textContent=data.error || 'Failed to add movie';
+    }
+  } catch(e){
+    messageEl.textContent='Server connection error';
+  }
+}
+
+async function fetchMovies(){
+  const listEl=document.getElementById('movies-list');
+  listEl.innerHTML='';
+  try{
+    const res = await fetch(`${API_BASE_URL}/api/movies/${userId}`);
+    const data = await res.json();
+    if(res.ok){
+      data.movies.forEach(m=>{
+        const li=document.createElement('li');
+        li.textContent=m;
+        listEl.appendChild(li);
+      });
+    }
+  } catch(e){
+    document.getElementById('movies-message').textContent='Server connection error';
+  }
+}
+
+function logout(){
+  userId=null; username=null;
+  document.getElementById('movies-section').classList.add('hidden');
+  document.getElementById('register-section').classList.remove('hidden');
+  document.getElementById('login-section').classList.remove('hidden');
+  document.getElementById('movies-list').innerHTML='';
+  document.getElementById('movies-message').textContent='';
+}
+</script>
